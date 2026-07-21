@@ -2,7 +2,7 @@
 
 > A live data science web app that analyses and predicts how Formula 1 race events affect the stock prices of publicly-traded companies linked to the sport.
 
-**Live Demo:** [f1-pulse.streamlit.app](https://your-app.streamlit.app) *(replace with your URL after deployment)*
+**🔗 Live Demo:** [F1 Pulse — Live App](https://f1-pulse-bupdkceywredqjhab5vn2y.streamlit.app/)
 
 ---
 
