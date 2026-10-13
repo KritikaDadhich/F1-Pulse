@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 import sys, os, requests
 
 sys.path.append(os.path.dirname(__file__))
-from utils.data_fetcher import get_stock_data, get_f1_events, _sample_f1_events
+from utils.data_fetcher import (get_stock_data, get_f1_events, get_driver_standings,
+    get_constructor_standings, get_race_schedule, get_data_source_status)
 from utils.feature_engineering import build_features
 from models.predictor import load_model as _load_model_raw, predict_impact
 
@@ -167,14 +168,35 @@ with st.sidebar:
 from utils.teams_sponsors import get_yfinance_ticker
 ticker = get_yfinance_ticker(ticker_raw, selected_stock["exchange"])
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_stock(ticker, lookback):
     end   = datetime.today()
     start = end - timedelta(days=lookback)
     return get_stock_data(ticker, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
 
-with st.spinner(f"Fetching live data for {ticker} from {selected_stock['exchange']}..."):
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_events(start, end):
+    return get_f1_events(start, end)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_schedule(year):
+    return get_race_schedule(year)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_driver_standings(year):
+    return get_driver_standings(year)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_constructor_standings(year):
+    return get_constructor_standings(year)
+
+with st.spinner(f"Fetching {ticker} from {selected_stock['exchange']}..."):
     stock_df = load_stock(ticker, lookback)
+
+# Show data quality badge
+is_synthetic = stock_df.get("is_synthetic", pd.Series([False])).any() if not stock_df.empty else True
+if is_synthetic:
+    st.warning("⚠️ Using estimated price data — yfinance could not reach Yahoo Finance. Real data will load when internet is available.", icon="⚠️")
 
 static_metrics = compute_static_metrics(selected_team)
 
@@ -207,6 +229,25 @@ with c1: st.markdown(mcard("Current price", current_price, f" {exch_currency}"),
 with c2: st.markdown(mcard("24h change", price_change, "%", True), unsafe_allow_html=True)
 with c3: st.markdown(mcard("Avg post-event return", static_metrics["avg_post_event"], "%"), unsafe_allow_html=True)
 with c4: st.markdown(mcard("Avg return after WIN", static_metrics["avg_post_win"], "%"), unsafe_allow_html=True)
+
+# ── Data source status badge ──────────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def check_data_sources():
+    return get_data_source_status()
+
+with st.expander("🔌 Live data source status", expanded=False):
+    src_status = check_data_sources()
+    s1, s2, s3, s4, s5 = st.columns(5)
+    def status_badge(label, active):
+        icon = "🟢" if active else "🔴"
+        return f"{icon} **{label}**"
+    with s1: st.markdown(status_badge("FastF1", src_status["fastf1"]))
+    with s2: st.markdown(status_badge("OpenF1", src_status["openf1"]))
+    with s3: st.markdown(status_badge("Jolpica", src_status["jolpica"]))
+    with s4: st.markdown(status_badge("Ergast", src_status["ergast"]))
+    with s5: st.markdown(status_badge("yfinance", src_status["yfinance"]))
+    active_f1 = next((k for k,v in src_status.items() if v and k != "yfinance"), "static_cache")
+    st.caption(f"F1 data tier in use: **{active_f1}** · Stock data: **{'live' if src_status['yfinance'] else 'synthetic fallback'}**")
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab1, tab_teams, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -300,9 +341,12 @@ with tab1:
     st.markdown("### Live stock price with F1 race markers")
     st.markdown(
         "<div class='explain-box'>"
-        "Each vertical line marks a race weekend. <b>Green</b> = team win, <b>Red</b> = crash/DNF, <b>Blue</b> = podium. "
-        "Watch how the stock price reacts in the days after each marker — that gap between the line and the next price "
-        "movement is the F1 effect this project measures."
+        "Each vertical line marks a race weekend. Colour shows the result <b>for the team linked to the selected stock</b>: "
+        "<b style='color:#22c55e'>Green</b> = that team WON · "
+        "<b style='color:#60a5fa'>Blue</b> = podium (2nd/3rd) · "
+        "<b style='color:#ef4444'>Red</b> = crash or DNF · "
+        "<b style='color:#6b7280'>Grey</b> = race happened but team finished outside top 3. "
+        "Hover over any race marker to see the full result."
         "</div>", unsafe_allow_html=True
     )
 
@@ -326,39 +370,108 @@ with tab1:
         )
 
     fig = go.Figure()
+
+    # Main price line
     fig.add_trace(go.Scatter(
         x=stock_df["Date"], y=stock_df["Close"],
         mode="lines", name="Close price",
         line=dict(color="#60a5fa", width=2),
-        hovertemplate="<b>%{x|%b %d %Y}</b><br>$%{y:.2f}<extra></extra>",
+        hovertemplate="<b>%{x|%b %d %Y}</b><br>Close: $%{y:.2f}<extra></extra>",
     ))
+
+    # 20-day moving average
     fig.add_trace(go.Scatter(
         x=stock_df["Date"], y=stock_df["Close"].rolling(20).mean(),
         mode="lines", name="20-day MA",
         line=dict(color="#f59e0b", width=1.5, dash="dot"),
+        hovertemplate="<b>%{x|%b %d %Y}</b><br>20d MA: $%{y:.2f}<extra></extra>",
     ))
 
-    color_map = {"WIN":"#22c55e","CRASH":"#ef4444","DNF":"#f97316","PODIUM":"#60a5fa","RACE":"#555"}
+    color_map = {
+        "WIN":    "#22c55e",
+        "PODIUM": "#60a5fa",
+        "CRASH":  "#ef4444",
+        "DNF":    "#f97316",
+        "RACE":   "#6b7280",
+    }
+
     for _, ev in events_df.iterrows():
-        ev_date  = ev["date"]
-        ev_type  = ev.get("event_type","RACE")
-        ev_color = color_map.get(ev_type, "#555")
+        ev_date     = pd.to_datetime(ev["date"])
+        ev_type     = ev.get("event_type", "RACE")
+        ev_color    = color_map.get(ev_type, "#6b7280")
+        race_name   = str(ev.get("race","")).replace(" Grand Prix","").replace(" GP","")
+        winner      = str(ev.get("winner",""))
+        winner_team = str(ev.get("winner_team",""))
+        event_icon  = {"WIN":"🏆","PODIUM":"🥈","CRASH":"💥","DNF":"🔴"}.get(ev_type,"🏁")
+
         subset = stock_df[stock_df["Date"] <= ev_date]
-        if subset.empty: continue
+        if subset.empty:
+            continue
         price_at = float(subset["Close"].iloc[-1])
-        fig.add_vline(x=ev_date, line_width=1.5, line_dash="dash", line_color=ev_color, opacity=0.7)
+
+        # Vertical dashed line
+        fig.add_shape(
+            type="line",
+            x0=ev_date, x1=ev_date,
+            y0=0, y1=1,
+            xref="x", yref="paper",
+            line=dict(color=ev_color, width=1.5, dash="dash"),
+            opacity=0.7,
+        )
+
+        # Invisible hoverable scatter — tooltip appears on hover, no dot visible
+        fig.add_trace(go.Scatter(
+            x=[ev_date],
+            y=[price_at + (stock_df["Close"].max() - stock_df["Close"].min()) * 0.08],
+            mode="markers",
+            marker=dict(color=ev_color, size=18, opacity=0),
+            showlegend=False,
+            name=race_name,
+            hovertemplate=(
+                f"<b>{race_name}</b><br>"
+                f"Date: {ev_date.strftime('%B %d, %Y')}<br>"
+                f"Winner: {winner}<br>"
+                f"Team: {winner_team}"
+                f"<extra></extra>"
+            ),
+        ))
+
+        # Label — same visual style as original
         fig.add_annotation(
-            x=ev_date, y=price_at,
-            text=f"🏁 {ev['race'].replace(' Grand Prix','').replace(' GP','')}",
-            showarrow=True, arrowhead=2, arrowcolor=ev_color, arrowsize=0.8,
+            x=ev_date,
+            y=price_at,
+            text=race_name,
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor=ev_color,
+            arrowsize=0.8,
             font=dict(size=9, color=ev_color),
-            bgcolor="#1c1f26", bordercolor=ev_color, borderwidth=1, borderpad=3, ay=-35,
+            bgcolor="#1c1f26",
+            bordercolor=ev_color,
+            borderwidth=1,
+            borderpad=3,
+            ay=-35,
         )
 
     fig.update_layout(
-        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        height=460, xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Price (USD)"),
-        legend=dict(orientation="h", y=1.02), margin=dict(l=10,r=10,t=30,b=10), hovermode="x unified",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=480,
+        xaxis=dict(
+            showgrid=False,
+            showspikes=False,         # removes white vertical spike line on hover
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="#1e2228",
+            title="Price (USD)",
+            showspikes=False,         # removes horizontal spike line on hover
+        ),
+        legend=dict(orientation="h", y=1.02),
+        margin=dict(l=10, r=10, t=30, b=10),
+        hovermode="closest",          # "closest" not "x unified" — removes white crosshair
+        hoverdistance=30,             # how close cursor must be to trigger hover
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -381,11 +494,25 @@ with tab2:
     col_yr, col_team = st.columns([1, 2])
     with col_yr:
         hist_year = st.selectbox("Select season", [2026, 2025, 2024, 2023, 2022, 2021], index=0)
-    with col_team:
-        team_filter = st.selectbox("Filter by team", ["All teams"] + sorted(set(r["winner_team"] for r in ALL_RACES.get(hist_year,[]))))
 
-    races_this_year = ALL_RACES.get(hist_year, [])
-    df_hist = pd.DataFrame(races_this_year)
+    # Dynamically fetch race results for selected year
+    with st.spinner(f"Loading {hist_year} race results..."):
+        df_hist = load_events(
+            f"{hist_year}-01-01",
+            f"{hist_year}-12-31"
+        )
+
+    # Show data source used
+    if not df_hist.empty and "data_source" in df_hist.columns:
+        src = df_hist["data_source"].mode()[0] if not df_hist.empty else "static_cache"
+        src_labels = {"fastf1":"🟢 FastF1 (live)", "openf1":"🟢 OpenF1 API (live)",
+                      "jolpica":"🟡 Jolpica/Ergast (live)", "ergast":"🟡 Ergast (live)",
+                      "static_cache":"🔵 Cached dataset"}
+        st.caption(f"Data source: {src_labels.get(src, src)}")
+
+    with col_team:
+        team_options = ["All teams"] + sorted(df_hist["winner_team"].dropna().unique().tolist()) if not df_hist.empty else ["All teams"]
+        team_filter  = st.selectbox("Filter by team", team_options)
 
     if team_filter != "All teams":
         df_hist = df_hist[df_hist["winner_team"] == team_filter]
@@ -411,15 +538,18 @@ with tab2:
             use_container_width=True, hide_index=True,
         )
 
-        st.markdown(f"**{hist_year} season:** {len(races_this_year)} races · "
-                    f"{len([r for r in races_this_year if r['winner_team']=='Red Bull Racing'])} Red Bull wins · "
-                    f"{len([r for r in races_this_year if r['winner_team']=='Ferrari'])} Ferrari wins · "
-                    f"{len([r for r in races_this_year if r['winner_team']=='McLaren'])} McLaren wins · "
-                    f"{len([r for r in races_this_year if r['winner_team']=='Mercedes'])} Mercedes wins")
+        if not df_hist.empty:
+            wins_by_team = df_hist["winner_team"].value_counts()
+            summary_parts = [f"**{hist_year} season:** {len(df_hist)} races"]
+            for team in ["Red Bull Racing", "McLaren", "Ferrari", "Mercedes"]:
+                cnt = wins_by_team.get(team, 0)
+                if cnt > 0:
+                    summary_parts.append(f"{cnt} {team.replace(' Racing','').replace('Red Bull','Red Bull')} wins")
+            st.markdown(" · ".join(summary_parts))
 
-    # Wins per team bar chart
-    all_winners = [r["winner_team"] for r in races_this_year]
-    wins_series = pd.Series(all_winners).value_counts().reset_index()
+    # Wins per team bar chart — from dynamic data
+    if not df_hist.empty:
+        wins_series = df_hist["winner_team"].value_counts().reset_index()
     wins_series.columns = ["Team","Wins"]
     wins_series["color"] = wins_series["Team"].map(TEAM_COLORS).fillna("#888")
 
@@ -449,8 +579,17 @@ with tab3:
     )
 
     stand_year = st.selectbox("Select year", [2026, 2025, 2024, 2023, 2022, 2021], index=0, key="stand_yr")
-    standings  = DRIVER_STANDINGS.get(stand_year, [])
-    df_stand   = pd.DataFrame(standings)
+
+    # Dynamically fetch live standings — updates after every race
+    with st.spinner(f"Fetching {stand_year} championship standings..."):
+        df_stand = load_driver_standings(stand_year)
+
+    if not df_stand.empty and "data_source" not in df_stand.columns:
+        pass  # standings fetched live
+
+    # Also fetch constructor standings
+    with st.spinner("Fetching constructor standings..."):
+        df_constructors = load_constructor_standings(stand_year)
 
     if not df_stand.empty:
         df_stand["color"] = df_stand["team"].map(TEAM_COLORS).fillna("#888")
@@ -488,14 +627,37 @@ with tab3:
             use_container_width=True, hide_index=True,
         )
 
-        # Multi-year points comparison for top 3 drivers
+        # Constructor standings from live API
+        if not df_constructors.empty:
+            st.markdown("#### Constructor championship standings")
+            df_constructors["color"] = df_constructors["team"].map(TEAM_COLORS).fillna("#888")
+            fig_con = go.Figure(go.Bar(
+                x=df_constructors["team"], y=df_constructors["points"],
+                marker_color=df_constructors["color"],
+                text=df_constructors["points"], textposition="outside",
+                hovertemplate="<b>%{x}</b><br>Points: %{y}<extra></extra>",
+            ))
+            fig_con.update_layout(
+                template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                height=300, title=f"{stand_year} Constructor Championship",
+                yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Points"),
+                xaxis=dict(showgrid=False), margin=dict(l=10,r=10,t=50,b=10),
+            )
+            st.plotly_chart(fig_con, use_container_width=True)
+
+        # Multi-year points comparison — dynamically fetch from live API
         st.markdown("#### Points across seasons — top contenders")
-        top_drivers = df_stand["driver"].head(4).tolist()
+        top_drivers = df_stand["driver"].head(4).tolist() if not df_stand.empty else []
         multi = []
-        for yr, rows in DRIVER_STANDINGS.items():
-            for r in rows:
-                if r["driver"] in top_drivers:
-                    multi.append({"Year": yr, "Driver": r["driver"], "Points": r["points"], "Team": r["team"]})
+        for yr in [2021, 2022, 2023, 2024, 2025, 2026]:
+            try:
+                yr_standings = load_driver_standings(yr)
+                for _, row in yr_standings.iterrows():
+                    if row["driver"] in top_drivers:
+                        multi.append({"Year": yr, "Driver": row["driver"],
+                                      "Points": row["points"], "Team": row["team"]})
+            except Exception:
+                pass
         df_multi = pd.DataFrame(multi)
         if not df_multi.empty:
             fig_multi = px.line(
@@ -505,7 +667,7 @@ with tab3:
             )
             fig_multi.update_layout(
                 template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                height=340, xaxis=dict(tickvals=[2021,2022,2023,2024,2025], showgrid=False),
+                height=340, xaxis=dict(tickvals=[2021,2022,2023,2024,2025,2026], showgrid=False),
                 yaxis=dict(showgrid=True, gridcolor="#1e2228"),
                 margin=dict(l=10,r=10,t=50,b=10),
             )
@@ -564,7 +726,7 @@ with tab5:
     st.markdown("### Predict stock impact for any upcoming race")
     st.markdown(
         "<div class='explain-box'>"
-        "Select a real upcoming Grand Prix from the 2025 calendar and simulate a race outcome. "
+        "Select a real upcoming Grand Prix from the 2026 calendar and simulate a race outcome. "
         "The XGBoost model predicts whether the linked stock will go UP or DOWN in the following 3 days, "
         "with a confidence score. This is your project's ML core — trained on 2018–2024 F1-stock event data."
         "</div>", unsafe_allow_html=True

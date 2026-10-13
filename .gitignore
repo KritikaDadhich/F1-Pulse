@@ -32,3 +32,11 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+# FastF1 cache
+.f1cache/
+
+# Node (local tooling)
+node_modules/
+package.json
+package-lock.json
