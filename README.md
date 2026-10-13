@@ -19,19 +19,19 @@ The app answers this across three layers:
 |-------|----------|--------|
 | **Descriptive** | Does a relationship exist? | Price chart + event markers |
 | **Statistical** | How significant is it? | Event study (CAR) + t-test |
-| **Predictive** | Can we forecast it? | XGBoost + ARIMA ensemble |
+| **Predictive** | Can we forecast it? | XGBoost classifier on real race × price data (+ ARIMA baseline) |
 
 ---
 
 ## Live Features
 
 - **Price & Events** — Live stock price chart with F1 race results overlaid as markers. Hover over any race marker to see the event details.
-- **Teams & Sponsors** — All 11 F1 teams (2026 grid), their publicly-traded parent companies, title sponsors, and engine suppliers — mapped to verified stock tickers across 10 global exchanges.
+- **Teams & Sponsors** — All 11 F1 teams (2026 grid), their publicly-traded parent companies, title sponsors, and engine suppliers — mapped to verified stock tickers across 12 global exchanges.
 - **F1 Race History** — Complete race results from 2021–2026, filterable by season and team, with win statistics and podium breakdowns.
 - ** Driver Standings** — Championship points table and multi-season comparison chart for all 22 drivers.
-- **Correlation Heatmap** — Real computed average stock returns by event type (WIN, PODIUM, DNF, CRASH) across Day +1 to Day +7 after each race.
-- **ML Prediction** — Simulate any upcoming 2026 Grand Prix and predict whether the linked stock will move UP or DOWN, with confidence score.
-- **Sentiment Analysis** — VADER NLP sentiment scores from real F1 news headlines via NewsAPI, plotted around race weekends.
+- **Correlation Heatmap** — Average stock returns computed live from real prices, grouped by the selected team's result (WIN, PODIUM, POINTS, NO POINTS, DNF), Day +1 to Day +7 after each race since 2021.
+- **ML Prediction** — Pick any upcoming Grand Prix from the live calendar and a result for the team; the model predicts whether the linked stock moves UP or DOWN over the next 3 trading days, using live stock, market and championship inputs.
+- **News Sentiment** — VADER sentiment of the last 7 days of headlines about the selected team via NewsAPI (needs a free API key).
 - **Event Study (CAR)** — Academic-grade Cumulative Abnormal Return analysis with t-test statistical significance.
 
 ---
@@ -44,13 +44,15 @@ f1-pulse/
 ├── train_model.py                # Offline model training script
 ├── requirements.txt
 ├── models/
-│   ├── predictor.py              # XGBoost + ARIMA ensemble
-│   └── xgb_model.pkl             # Pre-trained model (210 KB)
+│   ├── predictor.py              # Loads the model, makes predictions, ARIMA baseline
+│   ├── xgb_model.json            # Trained XGBoost model (portable JSON format)
+│   └── model_meta.json           # Training date, sample size, test accuracy
 └── utils/
-    ├── data_fetcher.py           # yfinance + static F1 event data
-    ├── feature_engineering.py   # Event study + feature pipeline
+    ├── data_fetcher.py           # Live F1 results (Jolpica → FastF1 → cache) + yfinance
+    ├── event_study.py           # Post-race returns + market-model event study
+    ├── ml_features.py           # Pre-race features for the ML model
     ├── teams_sponsors.py        # 11 teams, 37 companies, verified tickers
-    ├── f1_data.py               # Race results + standings 2021–2026
+    ├── f1_data.py               # Offline fallback copy of results + standings
     └── sentiment.py             # NewsAPI + VADER NLP
 ```
 
@@ -60,31 +62,35 @@ f1-pulse/
 
 ### Data Pipeline
 - **Stock prices** — `yfinance` (Yahoo Finance), daily OHLCV, primary exchange listings
-- **F1 race results** — Static verified dataset covering 2021–2026 (150+ races)
+- **F1 race results** — Live from the Jolpica F1 API (every race since 2021, refreshed every 30 minutes), FastF1 as backup, bundled copy only if both are offline
 - **News sentiment** — NewsAPI headlines, VADER sentiment scoring
-- **Feature window** — Minimum 730 days (2 seasons) for statistically meaningful samples
+- **Market index** — each stock is compared with its home index (S&P 500, DAX, FTSE 100, CAC 40, FTSE MIB, …)
 
 ### Feature Engineering
-For each race event, the pipeline computes:
-- `post_event_return` — actual % stock return over 3 trading days after the race
-- `pre_event_volatility` — 10-day rolling return standard deviation before race
-- `volume_spike` — race-day volume vs 20-day average (anomaly detector)
-- `rsi_at_event` — Relative Strength Index on race day
-- `rolling_win_rate` — team's win rate in last 5 races
-- `event_score` — numeric encoding: WIN=3, PODIUM=2, DNF=-1, CRASH=-2
+For each race, `utils/ml_features.py` computes only what was known before the race:
+- `event_score` — the team's result: WIN=3, PODIUM=2, POINTS=1, NO POINTS=0, DNF=-1
+- `pre_event_volatility` — standard deviation of the last 10 daily returns
+- `volume_spike` — last pre-race volume vs its 20-day average
+- `rsi_at_event` — 14-day RSI at the last pre-race close
+- `above_ma20` — whether the price is above its 20-day average
+- `market_trend_5d` — the home market index's return over the 5 days before the race
+- `team_form` — share of the team's last 5 races finished on the podium
+- `champ_pos` — the team's constructor-championship position going into the race
+- `season_progress` — round ÷ rounds in the season
+- Target: did the stock rise over the 3 trading days after the race?
 
 ### Machine Learning
 - **XGBoost classifier** — predicts stock direction (UP/DOWN) after upcoming races
-- **Training data** — 981 historical F1-stock event pairs across 6 seasons and 11 companies
-- **Cross-validation accuracy** — 68.2% (±1.0%) on held-out test set
-- **ARIMA(2,1,2)** — time series baseline for 5-day price forecasting
+- **Training data** — ~3,900 real race × company pairs (every team–sponsor link, every race since 2021)
+- **Time-based test** — trained on 2021–2024, tested on 2025–2026 races it never saw: **50.5% accuracy, AUC 0.51** (always guessing the most common direction: 46.5%). Short-term moves after a race are close to unpredictable — a result in line with the event study below.
+- **ARIMA(2,1,2)** — time series baseline for 5-day price forecasting (`arima_forecast` in `predictor.py`)
 
 ### Event Study (Academic Finance Method)
 1. **Estimation window** — 120 trading days before each race (days -130 to -10)
-2. **Expected return** — stock's historical mean return from estimation window
+2. **Expected return** — market model `E[R] = α + β × R_market`, fitted on the estimation window
 3. **Abnormal return** — `AR = Actual return − Expected return`
-4. **CAR** — cumulative sum of ARs from Day −5 to Day +7
-5. **T-test** — two-sample t-test on WIN vs non-WIN returns (p < 0.05 threshold)
+4. **CAR** — cumulative sum of ARs from Day −5 to Day +7 (significance table uses Day −1 to +7)
+5. **T-test** — one-sample t-test of each result group's CAR against zero (p < 0.05 threshold)
 
 ---
 
@@ -100,7 +106,7 @@ For each race event, the pipeline computes:
 | Global sponsors | LVMH (MC.PA), PepsiCo (PEP), Salesforce (CRM), AWS (AMZN) | EURONEXT, NASDAQ |
 | Betting partners | Flutter/FanDuel (FLUT) | NYSE |
 
-**37 verified public companies · 10 global exchanges · 11 countries**
+**37 verified public companies · 12 global exchanges · 11 countries**
 
 > All tickers use each company's **primary exchange listing** — not US OTC ADRs — for accurate, liquid pricing.
 
@@ -127,7 +133,7 @@ venv\Scripts\activate        # Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Train the ML model (creates models/xgb_model.pkl)
+# (Optional) Retrain the ML model on the latest data — updates models/xgb_model.json
 python train_model.py
 
 # Run the app
@@ -138,7 +144,7 @@ Open `http://localhost:8501` in your browser.
 
 ### Optional: Add NewsAPI key for real sentiment data
 1. Get a free key at [newsapi.org](https://newsapi.org) (no credit card)
-2. Create `.streamlit/secrets.toml`:
+2. Create `.streamlit/secrets.toml` (or add the same line to a `.env` file). On Streamlit Cloud, paste it under **App settings → Secrets**:
 ```toml
 NEWSAPI_KEY = "your_key_here"
 ```
@@ -152,9 +158,9 @@ This project was built as part of a **Master of Data Science** at **RMIT Univers
 | Subject | Application in this project |
 |---------|----------------------------|
 | Practical Data Science with Python | Full pipeline: `app.py`, all utils |
-| Data Wrangling using R → Python | `feature_engineering.py` merge logic |
+| Data Wrangling using R → Python | `data_fetcher.py`, `ml_features.py` merge logic |
 | Advanced Programming with Data Science | XGBoost pipeline, scikit-learn |
-| Time Series & Forecasting using R | ARIMA model in `predictor.py` |
+| Time Series & Forecasting using R | ARIMA baseline in `predictor.py`, event study |
 | Data Visualisation using R → Plotly | All 7 dashboard tabs |
 | Applied Analytics | Event study, CAR methodology |
 | Data Mining using Weka → XGBoost | Classification model training |

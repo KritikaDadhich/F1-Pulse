@@ -16,18 +16,19 @@ Why 2026 and not 2025?
 
 # ── Exchange reference ────────────────────────────────────────────────────────
 EXCHANGE_INFO = {
-    "NYSE":     {"full_name": "New York Stock Exchange",          "country": "USA",          "currency": "USD", "flag": "🇺🇸"},
-    "NASDAQ":   {"full_name": "NASDAQ",                            "country": "USA",          "currency": "USD", "flag": "🇺🇸"},
-    "LSE":      {"full_name": "London Stock Exchange",            "country": "UK",           "currency": "GBP", "flag": "🇬🇧"},
-    "XETRA":    {"full_name": "Deutsche Börse / Xetra",          "country": "Germany",      "currency": "EUR", "flag": "🇩🇪"},
-    "BIT":      {"full_name": "Borsa Italiana (Milan)",           "country": "Italy",        "currency": "EUR", "flag": "🇮🇹"},
-    "EURONEXT": {"full_name": "Euronext Paris",                    "country": "France",       "currency": "EUR", "flag": "🇫🇷"},
-    "SIX":      {"full_name": "SIX Swiss Exchange",               "country": "Switzerland",  "currency": "CHF", "flag": "🇨🇭"},
-    "HKSE":     {"full_name": "Hong Kong Stock Exchange",         "country": "Hong Kong",    "currency": "HKD", "flag": "🇭🇰"},
-    "TSE":      {"full_name": "Tokyo Stock Exchange",              "country": "Japan",        "currency": "JPY", "flag": "🇯🇵"},
-    "TADAWUL":  {"full_name": "Saudi Exchange (Tadawul)",         "country": "Saudi Arabia", "currency": "SAR", "flag": "🇸🇦"},
-    "MADRID":   {"full_name": "Bolsa de Madrid (BME)",            "country": "Spain",        "currency": "EUR", "flag": "🇪🇸"},
-    "ASX":      {"full_name": "Australian Securities Exchange",    "country": "Australia",    "currency": "AUD", "flag": "🇦🇺"},
+    "NYSE":     {"full_name": "New York Stock Exchange",          "country": "USA",          "currency": "USD", "flag": "🇺🇸", "index": "^GSPC"},
+    "NASDAQ":   {"full_name": "NASDAQ",                            "country": "USA",          "currency": "USD", "flag": "🇺🇸", "index": "^GSPC"},
+    "LSE":      {"full_name": "London Stock Exchange",            "country": "UK",           "currency": "GBP", "flag": "🇬🇧", "index": "^FTSE"},
+    "XETRA":    {"full_name": "Deutsche Börse / Xetra",          "country": "Germany",      "currency": "EUR", "flag": "🇩🇪", "index": "^GDAXI"},
+    "BIT":      {"full_name": "Borsa Italiana (Milan)",           "country": "Italy",        "currency": "EUR", "flag": "🇮🇹", "index": "FTSEMIB.MI"},
+    "EURONEXT": {"full_name": "Euronext Paris",                    "country": "France",       "currency": "EUR", "flag": "🇫🇷", "index": "^FCHI"},
+    "AMS":      {"full_name": "Euronext Amsterdam",                "country": "Netherlands",  "currency": "EUR", "flag": "🇳🇱", "index": "^AEX"},
+    "SIX":      {"full_name": "SIX Swiss Exchange",               "country": "Switzerland",  "currency": "CHF", "flag": "🇨🇭", "index": "^SSMI"},
+    "HKSE":     {"full_name": "Hong Kong Stock Exchange",         "country": "Hong Kong",    "currency": "HKD", "flag": "🇭🇰", "index": "^HSI"},
+    "TSE":      {"full_name": "Tokyo Stock Exchange",              "country": "Japan",        "currency": "JPY", "flag": "🇯🇵", "index": "^N225"},
+    "TADAWUL":  {"full_name": "Saudi Exchange (Tadawul)",         "country": "Saudi Arabia", "currency": "SAR", "flag": "🇸🇦", "index": "^TASI.SR"},
+    "MADRID":   {"full_name": "Bolsa de Madrid (BME)",            "country": "Spain",        "currency": "EUR", "flag": "🇪🇸", "index": "^IBEX"},
+    "ASX":      {"full_name": "Australian Securities Exchange",    "country": "Australia",    "currency": "AUD", "flag": "🇦🇺", "index": "^AXJO"},
 }
 
 # ── All 11 F1 teams — 2026 season (verified from formula1.com July 2026) ─────
@@ -194,7 +195,7 @@ F1_TEAMS_2026 = {
         ],
     },
     "Haas": {
-        "full_name": "MoneyGram Haas F1 Team",
+        "full_name": "TGR Haas F1 Team",
         "engine": "Ferrari",
         "base_country": "USA",
         "base_city": "Kannapolis, USA / Banbury, England",
@@ -207,7 +208,7 @@ F1_TEAMS_2026 = {
             "note": "Privately owned by American businessman Gene Haas. Uses Ferrari engines — Ferrari (NYSE:RACE) is the engine link.",
         },
         "key_public_sponsors": [
-            {"company": "MoneyGram International", "ticker": "MGRM",  "exchange": "NASDAQ", "role": "Title sponsor — MoneyGram on car", "on_car": True},
+            {"company": "Toyota Motor Corporation", "ticker": "7203.T", "exchange": "TSE",  "role": "Title sponsor — Toyota Gazoo Racing (TGR) renamed the team 'TGR Haas' from 2026, replacing MoneyGram", "on_car": True},
             {"company": "Ferrari N.V.",             "ticker": "RACE",  "exchange": "NYSE",   "role": "Engine supplier — Ferrari powers Haas", "on_car": False},
         ],
     },
@@ -279,9 +280,9 @@ GLOBAL_F1_SPONSORS = [
     # Global Partners
     {"company": "Saudi Aramco",            "ticker": "2222.SR","exchange": "TADAWUL", "role": "Global Partner — on every car livery, pit lane branding", "tier": "Global Partner", "public": True},
     {"company": "Amazon (AWS)",            "ticker": "AMZN",  "exchange": "NASDAQ",  "role": "Global Partner — powers F1's AI insights on TV since 2018", "tier": "Global Partner", "public": True},
-    {"company": "DHL (Deutsche Post AG)",  "ticker": "DPW.DE","exchange": "XETRA",   "role": "Global Logistics Partner — ships 2,000 tons of freight per race", "tier": "Global Partner", "public": True},
-    {"company": "Heineken N.V.",           "ticker": "HEIA.AS","exchange": "Euronext Amsterdam","role": "Global Partner — DHL Fastest Lap Award sponsor", "tier": "Global Partner", "public": True},
-    {"company": "Lenovo",                  "ticker": "992.HK","exchange": "HKSE",    "role": "Global Partner — technology sponsor", "tier": "Global Partner", "public": True},
+    {"company": "DHL Group",               "ticker": "DHL.DE","exchange": "XETRA",   "role": "Global Logistics Partner — ships 2,000 tons of freight per race", "tier": "Global Partner", "public": True},
+    {"company": "Heineken N.V.",           "ticker": "HEIA.AS","exchange": "AMS","role": "Global Partner — DHL Fastest Lap Award sponsor", "tier": "Global Partner", "public": True},
+    {"company": "Lenovo",                  "ticker": "0992.HK","exchange": "HKSE",    "role": "Global Partner — technology sponsor", "tier": "Global Partner", "public": True},
     {"company": "LVMH (Louis Vuitton/TAG Heuer/Moët)", "ticker": "MC.PA","exchange": "EURONEXT","role": "Global Partner — 10-year $1B deal from 2025. TAG Heuer is official timekeeper", "tier": "Global Partner", "public": True},
     {"company": "PepsiCo (Sting/Gatorade/Doritos)", "ticker": "PEP","exchange": "NASDAQ","role": "Global Partner — joined 2025 with Sting Energy, Gatorade, Doritos", "tier": "Global Partner", "public": True},
     {"company": "Qatar Airways",           "ticker": None,    "exchange": None,       "role": "Global Partner — Official Airline of F1 (state-owned, not publicly traded)", "tier": "Global Partner", "public": False},
@@ -351,7 +352,7 @@ TEAM_CAR_SPONSORS = {
         {"company": "Pirelli",             "ticker": "PIRC.MI","exchange": "BIT", "where": "Tyres"},
     ],
     "Haas": [
-        {"company": "MoneyGram International","ticker": "MGRM","exchange": "NASDAQ","where": "Team name + car livery"},
+        {"company": "Toyota Motor Corporation","ticker": "7203.T","exchange": "TSE","where": "Team name + car livery — Toyota Gazoo Racing"},
         {"company": "Pirelli",             "ticker": "PIRC.MI","exchange": "BIT", "where": "Tyres"},
     ],
     "Audi": [
@@ -436,6 +437,7 @@ def get_yfinance_ticker(ticker: str, exchange: str) -> str:
         "BIT":      ".MI",
         "LSE":      ".L",
         "EURONEXT": ".PA",
+        "AMS":      ".AS",
         "SIX":      ".SW",
         "HKSE":     ".HK",
         "TSE":      ".T",
@@ -469,6 +471,7 @@ def get_company_explainer(ticker: str, team_name: str) -> str:
         "MC.PA": "TAG Heuer (owned by LVMH) became F1's official timekeeper again in 2025 — their watches appear on screen every single lap. LVMH paid $1B over 10 years for this level of exposure.",
         "PEP": "PepsiCo joined F1 in 2025 with Sting Energy, Gatorade, and Doritos — reaching F1's 1.5 billion annual viewers, 40% of whom are now women, a new demographic for these brands.",
         "CRM": "Salesforce is both F1's global partner AND the Racing Bulls team sponsor. Their AI fan companion powered by Agentforce is being built for 827 million F1 fans globally.",
+        "7203.T": "Toyota Gazoo Racing is Haas's title sponsor from 2026 — Toyota's deepest F1 involvement since it left as a works team in 2009. Every Haas result now carries the Toyota name on TV, a direct brand signal for Toyota Motor Corp.",
         "FLUT": "FanDuel (owned by Flutter) is F1's first-ever US official betting partner. Every race drives millions in US betting volume — dramatic finishes, crashes, and underdogs winning spike FanDuel activity.",
     }
     return explainers.get(ticker,
@@ -555,4 +558,54 @@ TEAM_COLORS = {
     "Haas":          "#B6BABD",
     "Audi":          "#BB0000",
     "Cadillac":      "#CE1126",
+    # Former team names that appear in 2021–2025 results
+    "AlphaTauri":    "#5E8FAA",
+    "Alfa Romeo":    "#C92D4B",
+    "Kick Sauber":   "#52E252",
 }
+
+# ── Team name normalisation ───────────────────────────────────────────────────
+# The live APIs use their own constructor names ("Red Bull", "RB F1 Team",
+# "Haas F1 Team"...). Map them onto the names used throughout this app.
+TEAM_ALIASES = {
+    "red bull":                  "Red Bull Racing",
+    "red bull racing":           "Red Bull Racing",
+    "rb f1 team":                "Racing Bulls",
+    "rb":                        "Racing Bulls",
+    "racing bulls":              "Racing Bulls",
+    "visa cash app rb":          "Racing Bulls",
+    "alphatauri":                "AlphaTauri",
+    "alpine f1 team":            "Alpine",
+    "haas f1 team":              "Haas",
+    "sauber":                    "Kick Sauber",
+    "kick sauber":               "Kick Sauber",
+    "stake f1 team kick sauber": "Kick Sauber",
+    "alfa romeo":                "Alfa Romeo",
+    "cadillac f1 team":          "Cadillac",
+}
+
+# A 2026 team and the names the same entry raced under in earlier seasons
+TEAM_LINEAGE = {
+    "Racing Bulls": {"Racing Bulls", "AlphaTauri"},
+    "Audi":         {"Audi", "Kick Sauber", "Alfa Romeo"},
+}
+
+
+def canonical_team(name: str) -> str:
+    """Return the app's name for a constructor name from any data source."""
+    name = str(name or "").strip()
+    return TEAM_ALIASES.get(name.lower(), name)
+
+
+def team_matches(team_2026: str, name: str) -> bool:
+    """True if `name` is `team_2026` or one of its former names."""
+    return canonical_team(name) in TEAM_LINEAGE.get(team_2026, {team_2026})
+
+
+def current_team_for(name: str) -> str:
+    """Map a former team name (e.g. AlphaTauri) to its 2026 team."""
+    name = canonical_team(name)
+    for team, names in TEAM_LINEAGE.items():
+        if name in names:
+            return team
+    return name

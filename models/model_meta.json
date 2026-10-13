@@ -1,0 +1,22 @@
+{
+  "features": [
+    "event_score",
+    "pre_event_volatility",
+    "volume_spike",
+    "rsi_at_event",
+    "above_ma20",
+    "market_trend_5d",
+    "team_form",
+    "champ_pos",
+    "season_progress"
+  ],
+  "trained_at": "2026-10-13",
+  "rows": 3928,
+  "pairs": 32,
+  "races": 130,
+  "test_from": 2025,
+  "test_rows": 1232,
+  "test_accuracy": 0.505,
+  "test_auc": 0.512,
+  "baseline_accuracy": 0.465
+}
