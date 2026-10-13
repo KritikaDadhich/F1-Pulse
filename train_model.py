@@ -10,9 +10,10 @@ Evaluation is time-based: train on 2021–2024, test on 2025 onwards — the mod
 always scored on races it has never seen, in the future relative to its training data.
 The final model is then refit on all rows.
 
-Run it whenever you want to refresh the model, then commit the files in models/:
+Run it whenever you want to refresh the model, then commit models/ and data/f1_seasons/:
     python train_model.py
-Output: models/xgb_model.json (XGBoost's portable format) + models/model_meta.json
+Output: models/xgb_model.json (XGBoost's portable format) + models/model_meta.json,
+        and data/f1_seasons/ refreshed with every finished season (faster first load)
 """
 import sys, os, json
 sys.path.append(os.path.dirname(__file__))
@@ -22,7 +23,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from utils.data_fetcher import get_seasons, events_frame, get_stock_data, FIRST_SEASON
+from utils.data_fetcher import get_seasons, events_frame, get_stock_data, bundle_finished_seasons, FIRST_SEASON
 from utils.teams_sponsors import F1_TEAMS_2026, EXCHANGE_INFO, get_yfinance_ticker
 from utils.ml_features import training_rows, FEATURES
 from models.predictor import MODEL_PATH, META_PATH
@@ -53,6 +54,8 @@ def team_company_pairs():
 
 def build_dataset():
     today = datetime.today().strftime("%Y-%m-%d")
+    print("Refreshing data/f1_seasons/ (finished seasons shipped with the app)...")
+    print(f"  → {bundle_finished_seasons()}")
     print("Fetching race results...")
     events = events_frame(get_seasons(range(FIRST_SEASON, datetime.today().year + 1)))
     print(f"  → {len(events)} races")

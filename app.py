@@ -19,7 +19,7 @@ from utils.event_study import team_outcome, post_race_returns, event_study, OUTC
 from utils.ml_features import live_features
 from utils.sentiment import get_news_sentiment
 from utils.teams_sponsors import get_yfinance_ticker, current_team_for, team_matches
-from models.predictor import load_model as _load_model_raw, predict_impact
+from models.predictor import load_model as _load_model_raw, predict_impact, arima_forecast
 
 @st.cache_resource
 def load_model():
@@ -83,6 +83,11 @@ def load_season(year):
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_stock_history(ticker):
     return get_stock_data(ticker, HISTORY_FROM, TODAY.strftime("%Y-%m-%d"))
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_arima_forecast(ticker, steps=5):
+    """ARIMA(2,1,2) fitted on the last year of closes."""
+    return arima_forecast(load_stock_history(ticker).tail(252), steps)
 
 @st.cache_data(ttl=24*3600, show_spinner=False)
 def load_currency(ticker, fallback):
@@ -398,6 +403,9 @@ with tab1:
         if not events_df.empty:
             events_df["outcome"] = events_df["team_results"].apply(lambda tr: team_outcome(tr, selected_team)).fillna("NOT ON GRID")
 
+        show_fc = st.checkbox("Show 5-day ARIMA price forecast", value=True,
+                              help="ARIMA(2,1,2) time-series model fitted on the last year of daily closes, "
+                                   "with a 95% confidence band. A statistical baseline — not a trading signal.")
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=stock_df["Date"], y=stock_df["Close"],
@@ -448,6 +456,23 @@ with tab1:
                 font=dict(size=9, color=ev_color), bgcolor="#1c1f26",
                 bordercolor=ev_color, borderwidth=1, borderpad=3, ay=-35,
             )
+
+        fc = load_arima_forecast(ticker) if show_fc else pd.DataFrame()
+        if not fc.empty:
+            last = stock_df.iloc[-1]
+            fc_x = [last["Date"]] + list(fc["date"])
+            fig.add_trace(go.Scatter(
+                x=fc_x + fc_x[::-1],
+                y=[last["Close"]] + list(fc["upper_ci"]) + list(fc["lower_ci"])[::-1] + [last["Close"]],
+                mode="lines", fill="toself", fillcolor="rgba(167,139,250,0.15)", line=dict(width=0),
+                name="95% confidence", hoverinfo="skip",
+            ))
+            fig.add_trace(go.Scatter(
+                x=fc_x, y=[last["Close"]] + list(fc["forecast"]),
+                mode="lines+markers", name="ARIMA forecast",
+                line=dict(color="#a78bfa", width=2, dash="dot"),
+                hovertemplate=f"<b>%{{x|%b %d %Y}}</b><br>Forecast: %{{y:,.2f}} {exch_currency}<extra></extra>",
+            ))
 
         fig.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",

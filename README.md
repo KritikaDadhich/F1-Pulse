@@ -4,6 +4,10 @@
 
 **🔗 Live Demo:** [F1 Pulse — Live App](https://f1-pulse-bupdkceywredqjhab5vn2y.streamlit.app/)
 
+![tests](https://github.com/KritikaDadhich/F1-Pulse/actions/workflows/tests.yml/badge.svg)
+
+![F1 Pulse overview](docs/screenshots/overview.png)
+
 ---
 
 ## What This Project Does
@@ -23,9 +27,36 @@ The app answers this across three layers:
 
 ---
 
+## Key Findings
+
+Measured on **131 races (March 2021 – October 2026)** with real Yahoo Finance prices, each stock compared against its home market index:
+
+| Team → stock | Mean CAR [−1, +7] after a race, by the team's result |
+|---|---|
+| Ferrari → RACE (vs S&P 500) | WIN −1.31% (n=12, p=0.24) · PODIUM +0.17% (n=50, p=0.77) · DNF +0.66% (n=6, p=0.63) |
+| Mercedes → MBG.DE (vs DAX) | WIN −1.36% (n=27, p=0.07) · PODIUM −0.14% (n=47, p=0.83) |
+| Aston Martin → AML.L (vs FTSE 100) | PODIUM +1.82% (n=9, p=0.64) · DNF −0.22% (n=24, p=0.90) |
+| Alpine → RNO.PA (vs CAC 40) | PODIUM −2.30% (n=4, p=0.42) · DNF +0.53% (n=19, p=0.72) |
+| Audi → VOW3.DE (vs DAX) | DNF +0.43% (n=24, p=0.71) |
+| Cadillac → GM (vs S&P 500) | DNF +1.34% (n=10, p=0.58) |
+
+1. **No race result produces a statistically significant abnormal return** for any team's parent company (all p > 0.05). The popular claim that "Ferrari stock rises ~1.8% after a win" is not supported — the measured effect is −1.3% and indistinguishable from noise.
+2. **The ML model confirms it.** Trained on 2021–2024 and tested on 1,232 race × company pairs from 2025–2026 it never saw, it is right 50.5% of the time (AUC 0.51) — a coin flip. Race results carry no usable short-term trading signal.
+3. **Why:** these are large, diversified companies worth tens of billions; a single Sunday result is tiny next to earnings, macro news and market moves, and race outcomes are largely anticipated from qualifying and form.
+
+A null result, measured properly, is still a result: it shows the pipeline — event study, significance testing, time-based validation — doing its job instead of finding patterns in noise. *(Numbers update live in the app as new races are run.)*
+
+| Price & race markers + ARIMA forecast | Event study (CAR) |
+|---|---|
+| ![Price and events](docs/screenshots/price_events.png) | ![Event study](docs/screenshots/event_study.png) |
+| **Result × return heatmap** | **ML prediction** |
+| ![Heatmap](docs/screenshots/heatmap.png) | ![ML prediction](docs/screenshots/ml_prediction.png) |
+
+---
+
 ## Live Features
 
-- **Price & Events** — Live stock price chart with F1 race results overlaid as markers. Hover over any race marker to see the event details.
+- **Price & Events** — Live stock price chart with F1 race results overlaid as markers, plus a 5-day ARIMA forecast with 95% confidence band. Hover over any race marker to see the event details.
 - **Teams & Sponsors** — All 11 F1 teams (2026 grid), their publicly-traded parent companies, title sponsors, and engine suppliers — mapped to verified stock tickers across 12 global exchanges.
 - **F1 Race History** — Complete race results from 2021–2026, filterable by season and team, with win statistics and podium breakdowns.
 - ** Driver Standings** — Championship points table and multi-season comparison chart for all 22 drivers.
@@ -47,6 +78,8 @@ f1-pulse/
 │   ├── predictor.py              # Loads the model, makes predictions, ARIMA baseline
 │   ├── xgb_model.json            # Trained XGBoost model (portable JSON format)
 │   └── model_meta.json           # Training date, sample size, test accuracy
+├── data/f1_seasons/              # Finished seasons shipped with the app (fast first load)
+├── tests/                        # pytest suite, runs offline; CI on every push
 └── utils/
     ├── data_fetcher.py           # Live F1 results (Jolpica → FastF1 → cache) + yfinance
     ├── event_study.py           # Post-race returns + market-model event study
@@ -138,6 +171,10 @@ python train_model.py
 
 # Run the app
 streamlit run app.py
+
+# Run the tests (offline — no API calls)
+pip install -r requirements-dev.txt
+pytest
 ```
 
 Open `http://localhost:8501` in your browser.

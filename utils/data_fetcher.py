@@ -25,6 +25,7 @@ from utils.teams_sponsors import canonical_team
 
 _DIR         = os.path.dirname(os.path.abspath(__file__))
 FASTF1_CACHE = os.path.join(_DIR, "..", ".f1cache")
+BUNDLED_SEASONS = os.path.join(_DIR, "..", "data", "f1_seasons")
 
 JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1"
 HEADERS      = {"User-Agent": "F1Pulse/1.0", "Accept": "application/json"}
@@ -60,17 +61,22 @@ def get_stock_currency(ticker, fallback="USD"):
 
 # ── F1 RESULTS ────────────────────────────────────────────────────────────────
 
+def _season_file(folder, year):
+    return os.path.join(folder, f"season_v2_{year}.json")   # bump v2 when the row format changes
+
 def get_season_results(year):
     """One row per race of `year` that has results. Tries each tier in turn.
-    Finished seasons never change, so live results for them are kept on disk."""
-    path = os.path.join(FASTF1_CACHE, f"season_v2_{year}.json")   # bump when the row format changes
+    Finished seasons never change, so they are read from the copy shipped in
+    data/f1_seasons/ (or the local disk cache) instead of being re-fetched."""
     finished = year < datetime.today().year
-    if finished and os.path.exists(path):
-        try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+    path = _season_file(FASTF1_CACHE, year)
+    for candidate in (_season_file(BUNDLED_SEASONS, year), path):
+        if finished and os.path.exists(candidate):
+            try:
+                with open(candidate, encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
     rows = (_fetch_jolpica(year) or _fetch_fastf1(year) or _fetch_static(year))
     if finished and rows and rows[0]["data_source"] != "static_cache":
         try:
@@ -80,6 +86,18 @@ def get_season_results(year):
         except Exception:
             pass
     return rows
+
+def bundle_finished_seasons():
+    """Refresh data/f1_seasons/ with every finished season, fetched live. Returns years written."""
+    os.makedirs(BUNDLED_SEASONS, exist_ok=True)
+    written = []
+    for year in range(FIRST_SEASON, datetime.today().year):
+        rows = _fetch_jolpica(year) or _fetch_fastf1(year)
+        if rows:
+            with open(_season_file(BUNDLED_SEASONS, year), "w", encoding="utf-8") as f:
+                json.dump(rows, f, ensure_ascii=False, separators=(",", ":"))
+            written.append(year)
+    return written
 
 def get_seasons(years):
     """Results for several seasons, fetched in parallel. Returns a flat row list."""

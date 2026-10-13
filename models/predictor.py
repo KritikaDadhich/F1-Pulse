@@ -7,6 +7,7 @@ the team's result and pre-race stock/market features (see utils/ml_features.py).
 It is stored in XGBoost's own JSON format so it loads on any xgboost version >= 2.
 """
 import json
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -80,8 +81,9 @@ def arima_forecast(stock_df: pd.DataFrame, steps: int = 5) -> pd.DataFrame:
         return pd.DataFrame()
 
     try:
-        model  = ARIMA(prices, order=(2, 1, 2))
-        fitted = model.fit()
+        with warnings.catch_warnings():        # convergence chatter from statsmodels
+            warnings.simplefilter("ignore")
+            fitted = ARIMA(prices, order=(2, 1, 2)).fit()
         fc     = fitted.get_forecast(steps=steps)
         fc_df  = fc.summary_frame(alpha=0.05)
 
