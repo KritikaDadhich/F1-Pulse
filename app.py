@@ -571,7 +571,8 @@ with tab2:
         fig_wins.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             height=320, title=f"{hist_year} race wins by team",
-            yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Wins"),
+            yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Wins",
+                       range=[0, wins_series["Wins"].max() * 1.15]),
             xaxis=dict(showgrid=False), margin=dict(l=10,r=10,t=50,b=10),
         )
         st.plotly_chart(fig_wins, use_container_width=True)
@@ -601,6 +602,10 @@ with tab3:
             st.caption("🔵 Live standings unavailable — showing the cached top 10.")
         elif df_stand["after_round"].iloc[0]:
             st.caption(f"🟢 Live from Jolpica F1 API · after round {df_stand['after_round'].iloc[0]}")
+        # A driver's team in their most recent race (the standings API lists teams in no set order)
+        latest_team = {d: team for tr in load_season(stand_year)["team_results"]
+                       for team, res in (tr or {}).items() for d in res.get("drivers", [])}             if not load_season(stand_year).empty else {}
+        df_stand["team"] = df_stand["driver"].map(latest_team).fillna(df_stand["team"])
         df_stand["color"] = df_stand["team"].map(TEAM_COLORS).fillna("#888")
 
         fig_stand = go.Figure()
@@ -615,7 +620,8 @@ with tab3:
         fig_stand.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             height=max(350, len(df_stand)*32),
-            xaxis=dict(title="Championship points", showgrid=True, gridcolor="#1e2228"),
+            xaxis=dict(title="Championship points", showgrid=True, gridcolor="#1e2228",
+                       range=[0, max(df_stand["points"].max(), 1) * 1.22]),
             yaxis=dict(showgrid=False, autorange="reversed"),
             margin=dict(l=10,r=120,t=30,b=10),
             title=f"{stand_year} Driver Championship",
@@ -641,8 +647,9 @@ with tab3:
             ))
             fig_con.update_layout(
                 template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                height=300, title=f"{stand_year} Constructor Championship",
-                yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Points"),
+                height=320, title=f"{stand_year} Constructor Championship",
+                yaxis=dict(showgrid=True, gridcolor="#1e2228", title="Points",
+                           range=[0, max(df_constructors["points"].max(), 1) * 1.15]),
                 xaxis=dict(showgrid=False), margin=dict(l=10,r=10,t=50,b=10),
             )
             st.plotly_chart(fig_con, use_container_width=True)

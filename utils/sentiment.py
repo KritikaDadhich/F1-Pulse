@@ -31,6 +31,7 @@ def get_news_sentiment(team: str, api_key: str = "", days: int = 7) -> dict:
 
     params = {
         "q":        f'"{team}" AND (F1 OR "Formula 1" OR "Grand Prix")',
+        "searchIn": "title,description",   # match the team in the headline, not deep in the article body
         "from":     (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d"),
         "language": "en",
         "sortBy":   "publishedAt",
