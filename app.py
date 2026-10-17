@@ -335,7 +335,7 @@ with tab_teams:
                         rows.append({"Company": sp["company"], "Ticker": sp["ticker"], "Exchange": sp["exchange"], "Connection": sp["role"]})
                 rows.append({"Company": TYRE_SUPPLIER["company"], "Ticker": TYRE_SUPPLIER["ticker"], "Exchange": TYRE_SUPPLIER["exchange"], "Connection": "Tyre supplier (all teams)"})
                 rows.append({"Company": F1_PARENT_COMPANY["company"], "Ticker": F1_PARENT_COMPANY["ticker"], "Exchange": F1_PARENT_COMPANY["exchange"], "Connection": "Owns F1 itself"})
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
     st.markdown("#### Global F1 partners (apply to every team, every race)")
     st.markdown(
@@ -345,7 +345,7 @@ with tab_teams:
         "</div>", unsafe_allow_html=True
     )
     global_rows = [{"Company": s["company"], "Ticker": s.get("ticker") or "Private", "Exchange": s.get("exchange") or "—", "Role": s["role"]} for s in GLOBAL_F1_SPONSORS]
-    st.dataframe(pd.DataFrame(global_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(global_rows), width="stretch", hide_index=True)
 
     st.markdown("#### Stock exchanges represented in this project")
     exch_rows = []
@@ -353,7 +353,7 @@ with tab_teams:
         count = len([c for c in ALL_PUBLIC_COMPANIES if exch_code(c) == code])
         if count > 0:
             exch_rows.append({"Exchange": info["full_name"], "Code": code, "Country": info["country"], "Currency": info["currency"], "Companies tracked": count})
-    st.dataframe(pd.DataFrame(exch_rows).sort_values("Companies tracked", ascending=False), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(exch_rows).sort_values("Companies tracked", ascending=False), width="stretch", hide_index=True)
 
     st.markdown("#### A note on data accuracy")
     st.markdown(
@@ -483,7 +483,7 @@ with tab1:
             margin=dict(l=10, r=10, t=30, b=10),
             hovermode="closest", hoverdistance=30,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         if not events_df.empty:
             st.dataframe(
@@ -491,7 +491,7 @@ with tab1:
                 .sort_values("date", ascending=False)
                 .rename(columns={"date":"Date","race":"Grand Prix","circuit":"Circuit","winner":"Winner",
                                  "winner_team":"Winning team","outcome":f"{selected_team} result"}),
-                use_container_width=True, hide_index=True,
+                width="stretch", hide_index=True,
                 column_config={"Date": st.column_config.DateColumn(format="YYYY-MM-DD")},
             )
         else:
@@ -553,7 +553,7 @@ with tab2:
                 "round":"#","race":"Grand Prix","circuit":"Circuit","date":"Date",
                 "winner_team":"Winning Team","podium":"Podium (1–2–3)","stock_connection":"Stock Connection",
             }),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
             column_config={"Date": st.column_config.DateColumn(format="YYYY-MM-DD")},
         )
 
@@ -575,7 +575,7 @@ with tab2:
                        range=[0, wins_series["Wins"].max() * 1.15]),
             xaxis=dict(showgrid=False), margin=dict(l=10,r=10,t=50,b=10),
         )
-        st.plotly_chart(fig_wins, use_container_width=True)
+        st.plotly_chart(fig_wins, width="stretch")
 
 # ══════════════ TAB 3 — Driver Standings ══════════════
 with tab3:
@@ -626,13 +626,13 @@ with tab3:
             margin=dict(l=10,r=120,t=30,b=10),
             title=f"{stand_year} Driver Championship",
         )
-        st.plotly_chart(fig_stand, use_container_width=True)
+        st.plotly_chart(fig_stand, width="stretch")
 
         st.dataframe(
             df_stand[["position","driver","team","points","wins"]].rename(columns={
                 "position":"Pos","driver":"Driver","team":"Team","points":"Points","wins":"Wins"
             }),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
 
         if not df_constructors.empty:
@@ -652,7 +652,7 @@ with tab3:
                            range=[0, max(df_constructors["points"].max(), 1) * 1.15]),
                 xaxis=dict(showgrid=False), margin=dict(l=10,r=10,t=50,b=10),
             )
-            st.plotly_chart(fig_con, use_container_width=True)
+            st.plotly_chart(fig_con, width="stretch")
 
         st.markdown("#### Points across seasons — top contenders")
         top_drivers = df_stand["driver"].head(4).tolist()
@@ -676,7 +676,7 @@ with tab3:
                 yaxis=dict(showgrid=True, gridcolor="#1e2228"),
                 margin=dict(l=10,r=10,t=50,b=10),
             )
-            st.plotly_chart(fig_multi, use_container_width=True)
+            st.plotly_chart(fig_multi, width="stretch")
 
 # ══════════════ TAB 4 — Heatmap ══════════════
 with tab4:
@@ -714,14 +714,14 @@ with tab4:
             yaxis=dict(tickfont=dict(size=13), autorange="reversed"),
         )
         fig4.update_traces(textfont=dict(size=14, color="white"))
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width="stretch")
         st.caption("Green = stock rose on average. Red = stock fell. Raw returns — they include general market moves; "
                    "the Event Study tab strips those out. Small n means a cell is noisy.")
 
         with st.expander("See every race behind these numbers"):
             st.dataframe(
                 race_returns.sort_values("date", ascending=False).round(2),
-                use_container_width=True, hide_index=True,
+                width="stretch", hide_index=True,
                 column_config={"date": st.column_config.DateColumn("Date", format="YYYY-MM-DD")},
             )
 
@@ -803,9 +803,9 @@ with tab5:
                 {"Input": f"{selected_team} podiums in last 5 races", "Value": f"{features['team_form']:.0%}"},
                 {"Input": f"{selected_team} constructor-championship position", "Value": f"P{features['champ_pos']}"},
                 {"Input": "Season progress", "Value": f"{features['season_progress']:.0%}"},
-            ]), use_container_width=True, hide_index=True)
+            ]), width="stretch", hide_index=True)
 
-        if st.button("Run prediction", type="primary", use_container_width=True):
+        if st.button("Run prediction", type="primary", width="stretch"):
             typical, n_typ = avg_return(race_returns, "Day +3", expected_outcome)
             result = predict_impact(model, features, typical)
 
@@ -827,7 +827,7 @@ with tab5:
                 },
             ))
             fig_g.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", height=270, margin=dict(l=30,r=30,t=40,b=10))
-            st.plotly_chart(fig_g, use_container_width=True)
+            st.plotly_chart(fig_g, width="stretch")
             st.caption(f"Prediction made by: {result['source']}. Not financial advice. Academic project.")
 
     # ── Live news sentiment ──
@@ -886,7 +886,7 @@ with tab6:
             yaxis=dict(title="Cumulative abnormal return (%)", showgrid=True, gridcolor="#1e2228"),
             legend=dict(orientation="h", y=1.08), margin=dict(l=10,r=10,t=40,b=10),
         )
-        st.plotly_chart(fig6, use_container_width=True)
+        st.plotly_chart(fig6, width="stretch")
 
         from scipy import stats
         sig_rows = []
@@ -898,7 +898,7 @@ with tab6:
                              "p-value": round(p, 3) if pd.notna(p) else None,
                              "Significant (p < 0.05)": "✅ yes" if pd.notna(p) and p < 0.05 else "no"})
         st.markdown("#### Is the effect real or noise?")
-        st.dataframe(pd.DataFrame(sig_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(sig_rows), width="stretch", hide_index=True)
         st.caption(f"Average market beta of {selected_company} vs {market_ticker}: {per_race['beta'].mean():.2f}")
 
     st.markdown("#### Step-by-step: how the event study works")
